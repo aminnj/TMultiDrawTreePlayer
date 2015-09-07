@@ -38,7 +38,7 @@ bool execute()
 
 Voila, all your draws are done!
 
-There's one draw-back: you can't use these methods to directly draw and open histograms. You **must** you the ``>>histogram`` syntax inside your draw command to further retrieve the histogram and display it if you want.
+There's one draw-back: you can't use these methods to directly draw and open histograms. You **must** use the ``>>histogram`` syntax inside your draw command to further retrieve the histogram and display it if you want.
 
 ## Example
 
