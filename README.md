@@ -40,6 +40,22 @@ Voila, all your draws are done!
 
 There's one draw-back: you can't use these methods to directly draw and open histograms. You **must** use the ``>>histogram`` syntax inside your draw command to further retrieve the histogram and display it if you want.
 
+## Dictionnary generation
+
+You'll need to generate a ROOT dictionnary to use this class. Use the following command to create the C++ source file containing the dictionnary:
+
+```bash
+rootcint -f dictionary.cc -c -p classes.h LinkDef.h
+```
+
+## Test build
+
+Use the following command line to compile the class into a shared library. Not really useful, but allows to see if it's building.
+
+```bash
+g++ -shared -fPIC `root-config --cflags` -I. dictionary.cc TMultiDrawTreePlayer.cxx `root-config --ldflags --libs` -lTreePlayer
+```
+
 ## Example
 
 ```C++
