@@ -13,6 +13,8 @@
 #include "TVirtualMonitoring.h"
 #include "TTreeCache.h"
 
+#include <limits>
+
 ClassImp(TMultiDrawTreePlayer)
 
 TMultiDrawTreePlayer::TMultiDrawTreePlayer():
@@ -423,4 +425,3 @@ bool TMultiDrawTreePlayer::execute() {
 
     return res;
 }
-
