@@ -423,5 +423,7 @@ bool TMultiDrawTreePlayer::execute() {
     if (gMonitoringWriter)
         gMonitoringWriter->SendProcessingStatus("DONE");
 
+    m_draws.clear();
+
     return res;
 }
