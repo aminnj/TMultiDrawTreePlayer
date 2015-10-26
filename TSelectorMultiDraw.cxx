@@ -4,7 +4,7 @@
 ClassImp(TSelectorMultiDraw)
 
 Bool_t TSelectorMultiDraw::CompileVariables(const char *varexp/* = ""*/, const char *selection/* = ""*/) {
-    TSelectorDraw::CompileVariables(varexp, selection);
+    Bool_t ret = TSelectorDraw::CompileVariables(varexp, selection);
 
     // Disable quick load on all formulas
     if (fSelect)
@@ -13,4 +13,6 @@ Bool_t TSelectorMultiDraw::CompileVariables(const char *varexp/* = ""*/, const c
     for (size_t i = 0; i < fDimension; i++) {
         fVar[i]->SetQuickLoad(false);
     }
+
+    return ret;
 }
