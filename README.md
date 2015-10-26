@@ -53,7 +53,7 @@ rootcint -f dictionary.cc -c -p classes.h LinkDef.h
 Use the following command line to compile the class into a shared library. Not really useful, but allows to see if it's building.
 
 ```bash
-g++ -shared -fPIC `root-config --cflags` -I. dictionary.cc TMultiDrawTreePlayer.cxx `root-config --ldflags --libs` -lTreePlayer
+g++ -shared -fPIC `root-config --cflags` -I. dictionary.cc TMultiDrawTreePlayer.cxx TSelectorMultiDraw.cxx `root-config --ldflags --libs` -lTreePlayer
 ```
 
 ## Example

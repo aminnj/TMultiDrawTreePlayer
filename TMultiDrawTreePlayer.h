@@ -31,6 +31,8 @@
 #include "TTreePlayer.h"
 #endif
 
+#include <TSelectorMultiDraw.h>
+
 #include <memory>
 #include <unordered_map>
 

@@ -121,7 +121,7 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
    data.firstentry = firstentry;
    data.options = option;
 
-   data.selector.reset(new TSelectorDraw());
+   data.selector.reset(new TSelectorMultiDraw());
    data.selector->SetInputList(data.input.get());
 
    m_draws.push_back(data);

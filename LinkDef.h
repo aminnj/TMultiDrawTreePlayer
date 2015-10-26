@@ -5,5 +5,6 @@
 #pragma link C++ nestedclasses;
 
 #pragma link C++ class TMultiDrawTreePlayer+;
+#pragma link C++ class TSelectorMultiDraw+;
 
 #endif
