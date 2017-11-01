@@ -344,6 +344,13 @@ bool TMultiDrawTreePlayer::execute() {
         UpdateFormulaLeaves();
     }
 
+    std::chrono::time_point<std::chrono::system_clock> t_first = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> t_old = std::chrono::system_clock::now();
+    std::vector<double> deq;
+    int period = nentries/3000;
+    int smoothing = 40;
+
+
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
         entryNumber = fTree->GetEntryNumber(entry);
         if (entryNumber < 0) break;
@@ -351,6 +358,32 @@ bool TMultiDrawTreePlayer::execute() {
         if (gROOT->IsInterrupted()) break;
         localEntry = fTree->LoadTree(entryNumber);
         if (localEntry < 0) break;
+
+        // if (entryNumber % 10000 == 0) std::cout << entryNumber << std::endl;
+
+        if(entryNumber%period == 0) {
+            auto now = std::chrono::system_clock::now();
+            double dt = ((std::chrono::duration<double>)(now - t_old)).count();
+            t_old = now;
+            if (deq.size() >= smoothing) deq.erase(deq.begin());
+            deq.push_back(dt);
+            double avgdt = std::accumulate(deq.begin(),deq.end(),0.)/deq.size();
+            float prate = (float)period/avgdt;
+            float peta = (nentries-entryNumber)/prate;
+            if (isatty(1)) {
+                float pct = (float)entryNumber/(nentries*0.01);
+                if( ( nentries - entryNumber ) <= period ) {
+                    pct = 100.0;
+                    double dt_total = ((std::chrono::duration<double>)(now - t_first)).count();
+                    printf("\015\033[32m ---> \033[1m\033[31m%4.1f%% \033[34m [Avg rate: %.2f kHz, Time elapsed: %.0f s] \033[0m\033[32m  <---\033[0m\015 ", pct, nentries/(1000.*dt_total), dt_total);
+                } else {
+                    printf("\015\033[32m ---> \033[1m\033[31m%4.1f%% \033[34m [%.2f kHz, ETA: %.0f s] \033[0m\033[32m  <---\033[0m\015 ", pct, prate/1000.0, peta);
+                }
+                if( ( nentries - entryNumber ) > period ) fflush(stdout);
+                else std::cout << std::endl;
+
+            }
+        }
 
         bool abort = false;
         bool skipToNextFile = false;

@@ -31,10 +31,15 @@
 #include "TTreePlayer.h"
 #endif
 
-#include <TSelectorMultiDraw.h>
+#include "TSelectorMultiDraw.h"
 
 #include <memory>
 #include <unordered_map>
+#include <iostream>
+#include <unistd.h>
+#include <chrono>
+#include <ctime>
+#include <numeric>
 
 class TVirtualIndex;
 

@@ -2,7 +2,7 @@
 #ifndef ROOT_TSelectorMultiDraw
 #define ROOT_TSelectorMultiDraw
 
-#include <TSelectorDraw.h>
+#include "TSelectorDraw.h"
 
 class TSelectorMultiDraw: public TSelectorDraw {
     protected:
