@@ -56,6 +56,8 @@ Use the following command line to compile the class into a shared library. Not r
 g++ -shared -fPIC `root-config --cflags` -I. dictionary.cc TMultiDrawTreePlayer.cxx TSelectorMultiDraw.cxx `root-config --ldflags --libs` -lTreePlayer  -o libTMulti.so
 ```
 
+*OR* just do `source setup.sh`.
+
 ## Example
 
 ```C++
