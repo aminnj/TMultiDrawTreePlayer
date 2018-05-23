@@ -86,13 +86,14 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
    data.input.reset(new TList());
    data.input->Add(new TNamed("varexp",""));
    data.input->Add(new TNamed("selection",""));
+   data.s_selector = selection;
+   data.s_varexp = varexp0;
 
    TNamed *cvarexp    = (TNamed*) data.input->FindObject("varexp");
    TNamed *cselection = (TNamed*) data.input->FindObject("selection");
 
    if (cvarexp) cvarexp->SetTitle(varexp0);
    if (cselection) cselection->SetTitle(selection);
-
 
    TString opt = option;
    opt.ToLower();
@@ -252,7 +253,7 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
 }
 
 
-bool TMultiDrawTreePlayer::execute() {
+bool TMultiDrawTreePlayer::execute(bool quiet) {
     if (m_draws.empty())
         return false;
 
@@ -347,9 +348,11 @@ bool TMultiDrawTreePlayer::execute() {
     std::chrono::time_point<std::chrono::system_clock> t_first = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> t_old = std::chrono::system_clock::now();
     std::vector<double> deq;
-    int period = nentries/3000;
-    int smoothing = 40;
+    int period = nentries/10000;
+    int smoothing = 50;
 
+    TFile *prev_file = fTree->GetCurrentFile();
+    int ifile = 0;
 
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
         entryNumber = fTree->GetEntryNumber(entry);
@@ -361,7 +364,7 @@ bool TMultiDrawTreePlayer::execute() {
 
         // if (entryNumber % 10000 == 0) std::cout << entryNumber << std::endl;
 
-        if(entryNumber%period == 0) {
+        if(entryNumber%period == 0 and !quiet) {
             auto now = std::chrono::system_clock::now();
             double dt = ((std::chrono::duration<double>)(now - t_old)).count();
             t_old = now;
@@ -377,13 +380,13 @@ bool TMultiDrawTreePlayer::execute() {
                     double dt_total = ((std::chrono::duration<double>)(now - t_first)).count();
                     printf("\015\033[32m ---> \033[1m\033[31m%4.1f%% \033[34m [Avg rate: %.2f kHz, Time elapsed: %.0f s] \033[0m\033[32m  <---\033[0m\015 ", pct, nentries/(1000.*dt_total), dt_total);
                 } else {
-                    printf("\015\033[32m ---> \033[1m\033[31m%4.1f%% \033[34m [%.2f kHz, ETA: %.0f s] \033[0m\033[32m  <---\033[0m\015 ", pct, prate/1000.0, peta);
+                    printf("\015\033[32m ---> \033[1m\033[31m%4.1f%% \033[34m [%.2f kHz, ETA: %.0f s, file %d] \033[0m\033[32m  <---\033[0m\015 ", pct, prate/1000.0, peta, ifile);
                 }
                 if( ( nentries - entryNumber ) > period ) fflush(stdout);
                 else std::cout << std::endl;
-
             }
         }
+
 
         bool abort = false;
         bool skipToNextFile = false;
@@ -402,6 +405,7 @@ bool TMultiDrawTreePlayer::execute() {
             if(useCutFill) {
                 if (data.selector->ProcessCut(localEntry))
                     data.selector->ProcessFill(localEntry); //<==call user analysis function
+                    // data.selector->Process(localEntry); //<==call user analysis function
             } else {
                 data.selector->Process(localEntry);        //<==call user analysis function
             }
@@ -413,6 +417,11 @@ bool TMultiDrawTreePlayer::execute() {
                 skipToNextFile = true;
                 data.selector->ResetAbort();
             }
+        }
+
+        if (entry % 10000 and fTree->GetCurrentFile() != prev_file) {
+            ifile++;
+            prev_file = fTree->GetCurrentFile();
         }
 
         if (gMonitoringWriter)
@@ -427,6 +436,7 @@ bool TMultiDrawTreePlayer::execute() {
             skipToNextFile = false;
         }
     }
+
 
     delete timer;
     //we must reset the cache

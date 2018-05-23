@@ -50,6 +50,8 @@ struct DrawData {
     Long64_t    firstentry;
     Long64_t    nentries;
     std::string options;
+    std::string s_varexp;
+    std::string s_selector;
 };
 
 class NotifyProxier: public TObject {
@@ -86,7 +88,7 @@ public:
    virtual ~TMultiDrawTreePlayer();
 
    virtual bool queueDraw(const char* varexp, const char* selection, Option_t *option = "", Long64_t nentries = 1000000000, Long64_t firstentry = 0);
-   virtual bool execute();
+   virtual bool execute(bool quiet=false);
 
    ClassDef(TMultiDrawTreePlayer, 3);  //Manager class to play with TTrees
 };
