@@ -1,4 +1,5 @@
 import time
+import os
 from tqdm import tqdm
 import ROOT as r
 r.gROOT.SetBatch()
@@ -109,7 +110,7 @@ class ParallelMultiDrawer(object):
         firsts_and_nentries = zip(firsts[:-1],diffs)
 
         if use_my_tqdm:
-            r.gROOT.ProcessLine(".L tqdm.h")
+            r.gROOT.ProcessLine(".L {}/tqdm.h".format(os.path.realpath(__file__).rsplit("/",1)[0]))
             bar = r.tqdm()
 
         q = Queue(N)
