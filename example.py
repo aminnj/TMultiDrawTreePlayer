@@ -1,5 +1,5 @@
 import ROOT as r
-from api import ParallelMultiDrawer
+from api import ParallelMultiDrawer, MultiDrawer
 
 # Make a chain like usual
 chain = r.TChain("t")
@@ -17,5 +17,5 @@ for i in range(3,10):
 
 # Use N threads - generally results in factor of N speedup
 # Since we're limited by CPU for unpacking objects from the rootfile
-hists = md.execute(N=8)
+hists = md.execute(N=5)
 print "means:", map(lambda x: x.GetMean(), hists.values())
