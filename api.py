@@ -125,13 +125,17 @@ class ParallelMultiDrawer(object):
         def get_sum(cs):
             return sum(map(lambda x:x.value, cs))
 
+
         if use_my_tqdm:
             total = last
             done = get_sum(dones)
-            while done < total-1:
+            while done < total:
                 done = get_sum(dones)
                 bar.progress(done,total,True)
-                time.sleep(0.1)
+                which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
+                bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
+                time.sleep(0.05)
+            print
         else:
             total = last
             prev_done = get_sum(dones)

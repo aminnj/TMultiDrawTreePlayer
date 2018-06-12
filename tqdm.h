@@ -25,7 +25,7 @@ class tqdm {
         bool color_transition = true;
         int width = 40;
         int period = 1;
-        int smoothing = 50;
+        int smoothing = 20;
         unsigned long nupdates = 0;
 
         std::string right_pad = "▏";
@@ -106,12 +106,15 @@ class tqdm {
                 double avgdt = accum;
 
                 float prate = (float)period/avgdt;
+                if (force_update) prate = (float)curr/dt_tot;
+                
                 // learn an appropriate period length to avoid spamming stdout
                 // and slowing down the loop, shoot for ~25Hz and smooth over 10 seconds
                 if (nupdates > 10) {
-                    period = (int)( std::min(std::max((1.0/25)*curr/dt_tot,1.0), 5e5));
+                    period = (int)( std::min(std::max((1.0/50)*curr/dt_tot,1.0), 5e5));
                     smoothing = (int)(std::min(5.0/dt,1000.0));
                 }
+
                 float peta = (tot-curr)/prate;
                 float pct = (float)curr/(tot*0.01);
                 if( ( tot - curr ) <= period ) {
@@ -155,7 +158,7 @@ class tqdm {
                 if (use_colors) printf("\033[0m\033[32m\033[0m\015 ");
 
                 if( ( tot - curr ) > period ) fflush(stdout);
-                else std::cout << std::endl;
+                // else std::cout << std::endl;
 
             }
         }
