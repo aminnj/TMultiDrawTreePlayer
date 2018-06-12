@@ -82,12 +82,17 @@ private:
 
 protected:
    std::vector<DrawData> m_draws;
+   // int done_ = 0;
+   // int total_ = 0;
 
 public:
    TMultiDrawTreePlayer();
    virtual ~TMultiDrawTreePlayer();
 
    virtual bool queueDraw(const char* varexp, const char* selection, Option_t *option = "", Long64_t nentries = 1000000000, Long64_t firstentry = 0);
+   // virtual bool execute(bool quiet=false, int& done=done_, int& total=total_);
+   // virtual void bindProgress(int& done, int& total);
+   virtual bool execute(bool quiet, int first, int numentries, int& done, int& total);
    virtual bool execute(bool quiet=false);
 
    ClassDef(TMultiDrawTreePlayer, 3);  //Manager class to play with TTrees

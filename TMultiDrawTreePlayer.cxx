@@ -252,10 +252,24 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
 
 }
 
+// void TMultiDrawTreePlayer::bindProgress(int &done, int& total) {
+//     done_ = done;
+//     total_ = total;
+// }
 
 bool TMultiDrawTreePlayer::execute(bool quiet) {
+    int done = 0;
+    int total = 0;
+    return TMultiDrawTreePlayer::execute(quiet, -1, -1, done, total);
+}
+
+// bool TMultiDrawTreePlayer::execute(bool quiet, int& done, int& total) {
+bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& done, int& total) {
     if (m_draws.empty())
         return false;
+
+    // done_ = 2;
+    // total_ = 4;
 
     // Process this tree executing the code in the specified selector.
     // The return value is -1 in case of error and TSelector::GetStatus() in
@@ -297,9 +311,14 @@ bool TMultiDrawTreePlayer::execute(bool quiet) {
         data.selector->Notify();
     }
 
-    Long64_t nentries = lastentry - firstentry;
 
+    Long64_t nentries = lastentry - firstentry;
     nentries = GetEntriesToProcess(firstentry, nentries);
+
+    if (first >= 0) firstentry = first;
+    if (numentries >= 0) nentries = numentries;
+
+    total = nentries;
 
     NotifyProxier notifyProxier(m_draws);
     fTree->SetNotify(&notifyProxier);
@@ -419,7 +438,7 @@ bool TMultiDrawTreePlayer::execute(bool quiet) {
             }
         }
 
-        if (entry % 10000 and fTree->GetCurrentFile() != prev_file) {
+        if (entry % 10000 == 0 and fTree->GetCurrentFile() != prev_file) {
             ifile++;
             prev_file = fTree->GetCurrentFile();
         }
@@ -435,7 +454,12 @@ bool TMultiDrawTreePlayer::execute(bool quiet) {
             entry += fTree->GetTree()->GetEntries() - localEntry;
             skipToNextFile = false;
         }
+
+        if (entry % 10000 == 0) {
+            done = entry-firstentry;
+        }
     }
+    done = nentries;
 
 
     delete timer;
