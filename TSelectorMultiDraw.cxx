@@ -1,5 +1,7 @@
 #include <TSelectorMultiDraw.h>
 #include <TTreeFormula.h>
+#include <TTreeFormulaManager.h>
+#include <TTree.h>
 
 ClassImp(TSelectorMultiDraw)
 
@@ -16,3 +18,47 @@ Bool_t TSelectorMultiDraw::CompileVariables(const char *varexp/* = ""*/, const c
 
     return ret;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// Called in the entry loop for all entries accepted by Select.
+
+void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double cache_val)
+{
+    // fObjEval fMultiplicity fForceRead fSelect fVal fNfill 
+    // printf("%i %i %i %i\n",fObjEval,fMultiplicity,fForceRead,fNfill);
+    // printf("%i %i\n",fNfill,fTree->GetEstimate());
+    // printf("%f %f %i %f\n",fWeight,fSelect->EvalInstance(0), fDimension, fVar[0]->EvalInstance(0));
+   if (fObjEval) {
+      ProcessFillObject(entry);
+      return;
+   }
+
+   if (fMultiplicity) {
+      ProcessFillMultiple(entry);
+      return;
+   }
+
+   // simple case with no multiplicity
+   if (fForceRead && fManager->GetNdata() <= 0) return;
+
+   if (fSelect) {
+       fW[fNfill] = fWeight * fSelect->EvalInstance(0);
+       if (!fW[fNfill]) return;
+        // printf("%f %f\n",fWeight,fW[fNfill]);
+   } else fW[fNfill] = fWeight;
+   if (fVal) {
+       if (fDimension == 1 && use_cache) {
+           fVal[0][fNfill] = cache_val;
+       } else {
+           for (Int_t i = 0; i < fDimension; ++i) {
+               if (fVar[i]) fVal[i][fNfill] = fVar[i]->EvalInstance(0);
+           }
+       }
+   }
+   fNfill++;
+   if (fNfill >= fTree->GetEstimate()) {
+       TakeAction();
+       fNfill = 0;
+   }
+}
+

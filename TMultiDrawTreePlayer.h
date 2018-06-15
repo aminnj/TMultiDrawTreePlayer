@@ -44,7 +44,7 @@
 class TVirtualIndex;
 
 struct DrawData {
-    std::shared_ptr<TSelectorDraw> selector;
+    std::shared_ptr<TSelectorMultiDraw> selector;
     std::shared_ptr<TList>         input;
 
     Long64_t    firstentry;
@@ -52,6 +52,9 @@ struct DrawData {
     std::string options;
     std::string s_varexp;
     std::string s_selector;
+    int hash_varexp;
+    int hash_selector;
+    int dimension;
 };
 
 class NotifyProxier: public TObject {

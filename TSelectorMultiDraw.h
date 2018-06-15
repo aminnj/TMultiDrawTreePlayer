@@ -9,6 +9,9 @@ class TSelectorMultiDraw: public TSelectorDraw {
         virtual Bool_t CompileVariables(const char *varexp="", const char *selection="");
 
     public:
+        
+        virtual void ProcessFillMine(Long64_t entry, bool use_cache=false, double cache_val=-999.);
+
         ClassDef(TSelectorMultiDraw, 1);  //A specialized TSelector for multi-drawing
 };
 

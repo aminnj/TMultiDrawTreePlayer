@@ -12,9 +12,11 @@
 #include "TH1.h"
 #include "TVirtualMonitoring.h"
 #include "TTreeCache.h"
+#include "TString.h"
 
 #include "tqdm.h"
 #include <limits>
+#include <map>
 
 ClassImp(TMultiDrawTreePlayer)
 
@@ -89,6 +91,13 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
    data.input->Add(new TNamed("selection",""));
    data.s_selector = selection;
    data.s_varexp = varexp0;
+
+   TString ts_varexp0(varexp0);
+   auto tokens = ts_varexp0.Tokenize(">>");
+   auto ts_varexp0_nohist = ((TObjString *)(tokens->At(0)))->String();
+   data.hash_varexp = std::hash<std::string>{}(ts_varexp0_nohist.Data());
+   data.hash_selector = std::hash<std::string>{}(std::string(selection));
+   // std::cout <<  " varexp0: " << varexp0 <<  " data.hash_varexp: " << data.hash_varexp <<  " selection: " << selection <<  " data.hash_selector: " << data.hash_selector <<  std::endl;
 
    TNamed *cvarexp    = (TNamed*) data.input->FindObject("varexp");
    TNamed *cselection = (TNamed*) data.input->FindObject("selection");
@@ -310,6 +319,7 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
         if (data.selector->Version() >= 2)
             data.selector->Init(fTree);
         data.selector->Notify();
+        data.dimension = data.selector->GetDimension();
     }
 
 
@@ -367,6 +377,13 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
     tqdm bar;
 
+    // compute unique selectors only once per event
+    bool use_cache_selector = false;
+    // compute unique values only once per event
+    bool use_cache_value = false;
+    std::map<int, bool> map_selectors;
+    std::map<int, double> map_varexp;
+
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
         entryNumber = fTree->GetEntryNumber(entry);
         if (entryNumber < 0) break;
@@ -377,6 +394,8 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
         if (!quiet) bar.progress(entryNumber, nentries);
 
+        if (use_cache_selector) map_selectors.clear();
+        if (use_cache_value) map_varexp.clear();
 
         bool abort = false;
         bool skipToNextFile = false;
@@ -392,10 +411,43 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
             bool useCutFill = data.selector->Version() == 0;
 
+            // std::cout <<  " useCutFill: " << useCutFill <<  " localEntry: " << localEntry <<  " data.s_selector: " << data.s_selector <<  " data.s_varexp: " << data.s_varexp <<  std::endl;
             if(useCutFill) {
-                if (data.selector->ProcessCut(localEntry))
-                    data.selector->ProcessFill(localEntry); //<==call user analysis function
-                    // data.selector->Process(localEntry); //<==call user analysis function
+
+                bool pass_cut = false;
+                if (use_cache_selector) {
+                    auto iter = map_selectors.find(data.hash_selector);
+                    if (iter != map_selectors.end()) {
+                        // std::cout <<  " found selector localEntry: " << localEntry << " " << pass_cut <<  std::endl;
+                        pass_cut = iter->second;
+                    } else {
+                        pass_cut = data.selector->ProcessCut(localEntry);
+                        // std::cout <<  " didn't find selector localEntry: " << localEntry << " " << pass_cut <<  std::endl;
+                    }
+                    map_selectors[data.hash_selector] = pass_cut;
+                } else {
+                    pass_cut = data.selector->ProcessCut(localEntry);
+                }
+
+                if (pass_cut) {
+
+                    if (use_cache_value && (data.dimension == 1)) {
+                        auto iter = map_varexp.find(data.hash_varexp);
+                        double val = -1;
+                        if (iter != map_varexp.end()) {
+                            val = iter->second;
+                            // std::cout <<  " found value localEntry: " << localEntry << " " << val <<  std::endl;
+                        } else {
+                            val = data.selector->GetVar(0)->EvalInstance(0);
+                            // std::cout <<  " didn't find value localEntry: " << localEntry << " " << val <<  std::endl;
+                        }
+                        map_varexp[data.hash_varexp] = val;
+                        data.selector->ProcessFillMine(localEntry, true, val); //<==call user analysis function
+                    } else {
+                        data.selector->ProcessFill(localEntry); //<==call user analysis function
+                    }
+
+                }
             } else {
                 data.selector->Process(localEntry);        //<==call user analysis function
             }
