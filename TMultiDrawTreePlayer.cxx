@@ -381,8 +381,8 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
     bool use_cache_selector = false;
     // compute unique values only once per event
     bool use_cache_value = false;
-    std::map<int, bool> map_selectors;
-    std::map<int, double> map_varexp;
+    std::unordered_map<int, bool> map_selectors;
+    std::unordered_map<int, double> map_varexp;
 
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
         entryNumber = fTree->GetEntryNumber(entry);
