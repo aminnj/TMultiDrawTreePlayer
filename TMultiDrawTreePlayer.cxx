@@ -400,9 +400,9 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
     tqdm bar;
 
     // compute unique selectors only once per event
-    bool use_cache_selector = false;
+    bool use_cache_selector = true;
     // compute unique values only once per event
-    bool use_cache_value = false;
+    bool use_cache_value = true;
 
     // vector of booleans to tell whether a particular index has been cached
     std::vector<bool> use_map_selectors(maxidx, false);
