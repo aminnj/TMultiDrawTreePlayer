@@ -42,7 +42,9 @@ void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double 
    if (fForceRead && fManager->GetNdata() <= 0) return;
 
    if (fSelect) {
-       fW[fNfill] = fWeight * fSelect->EvalInstance(0);
+       fW[fNfill] = fWeight * fSelect->EvalInstance(0); // XXX <--- the fSelect eval is slow!, cache it!
+       // printf("%f\n", weight);
+       // fW[fNfill] = fWeight * weight;
        if (!fW[fNfill]) return;
         // printf("%f %f\n",fWeight,fW[fNfill]);
    } else fW[fNfill] = fWeight;
@@ -60,5 +62,6 @@ void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double 
        TakeAction();
        fNfill = 0;
    }
+
 }
 

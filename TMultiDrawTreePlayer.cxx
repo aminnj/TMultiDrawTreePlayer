@@ -95,9 +95,7 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
    TString ts_varexp0(varexp0);
    auto tokens = ts_varexp0.Tokenize(">>");
    auto ts_varexp0_nohist = ((TObjString *)(tokens->At(0)))->String();
-   data.hash_varexp = std::hash<std::string>{}(ts_varexp0_nohist.Data());
-   data.hash_selector = std::hash<std::string>{}(std::string(selection));
-   // std::cout <<  " varexp0: " << varexp0 <<  " data.hash_varexp: " << data.hash_varexp <<  " selection: " << selection <<  " data.hash_selector: " << data.hash_selector <<  std::endl;
+   data.s_varexp_nohist = ts_varexp0_nohist.Data();
 
    TNamed *cvarexp    = (TNamed*) data.input->FindObject("varexp");
    TNamed *cselection = (TNamed*) data.input->FindObject("selection");
@@ -304,6 +302,30 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
     //TDirectory::TContext ctxt(0);
     
+    // Map from draw/selection strings to arbitrary int (to uniquify both)
+    std::map<std::string,int> unique_varexp;
+    std::map<std::string,int> unique_selector;
+    for (auto draw  : m_draws) {
+        unique_varexp[draw.s_varexp_nohist] = 1;
+        unique_selector[draw.s_selector] = 1;
+    }
+    // Conversion between unique elements and an index starting with 0
+    // To index a vector later
+    std::map<std::string,int> index_varexp;
+    std::map<std::string,int> index_selector;
+    int idx1 = 0;
+    int idx2 = 0;
+    for (auto& it : unique_varexp) { index_varexp[it.first] = idx1; idx1 += 1; }
+    for (auto& it : unique_selector) { index_selector[it.first] = idx2; idx2 += 1; }
+    // Keep track of the length of vector we'll need later
+    int maxidx = std::max(idx1,idx2) + 1;
+    // std::cout <<  " maxidx: " << maxidx <<  std::endl;
+    // Store the vector indices into the draw structs
+    for (auto& draw  : m_draws) {
+        draw.index_varexp = index_varexp[draw.s_varexp_nohist];
+        draw.index_selector = index_selector[draw.s_selector];
+    }
+
     Long64_t firstentry = std::numeric_limits<Long64_t>::max();
     Long64_t lastentry = 0;
 
@@ -381,8 +403,14 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
     bool use_cache_selector = false;
     // compute unique values only once per event
     bool use_cache_value = false;
-    std::unordered_map<int, bool> map_selectors;
-    std::unordered_map<int, double> map_varexp;
+
+    // vector of booleans to tell whether a particular index has been cached
+    std::vector<bool> use_map_selectors(maxidx, false);
+    std::vector<bool> use_map_varexp(maxidx, false);
+    // cached values
+    std::vector<bool> vec_map_selectors(maxidx, false);
+    std::vector<double> vec_map_varexp(maxidx, -999.);
+
 
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
         entryNumber = fTree->GetEntryNumber(entry);
@@ -394,8 +422,9 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
         if (!quiet) bar.progress(entryNumber, nentries);
 
-        if (use_cache_selector) map_selectors.clear();
-        if (use_cache_value) map_varexp.clear();
+        // reset booleans to false (so we will need to recompute/recache)
+        if (use_cache_selector) std::fill(use_map_selectors.begin(), use_map_selectors.end(), false);
+        if (use_cache_value) std::fill(use_map_varexp.begin(), use_map_varexp.end(), false);
 
         bool abort = false;
         bool skipToNextFile = false;
@@ -416,32 +445,25 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
                 bool pass_cut = false;
                 if (use_cache_selector) {
-                    auto iter = map_selectors.find(data.hash_selector);
-                    if (iter != map_selectors.end()) {
-                        // std::cout <<  " found selector localEntry: " << localEntry << " " << pass_cut <<  std::endl;
-                        pass_cut = iter->second;
-                    } else {
+                    pass_cut = vec_map_selectors[data.index_selector];
+                    if (!use_map_selectors[data.index_selector]) {
                         pass_cut = data.selector->ProcessCut(localEntry);
-                        // std::cout <<  " didn't find selector localEntry: " << localEntry << " " << pass_cut <<  std::endl;
+                        vec_map_selectors[data.index_selector] = pass_cut;
+                        use_map_selectors[data.index_selector] = true;
                     }
-                    map_selectors[data.hash_selector] = pass_cut;
                 } else {
                     pass_cut = data.selector->ProcessCut(localEntry);
                 }
 
                 if (pass_cut) {
 
-                    if (use_cache_value && (data.dimension == 1)) {
-                        auto iter = map_varexp.find(data.hash_varexp);
-                        double val = -1;
-                        if (iter != map_varexp.end()) {
-                            val = iter->second;
-                            // std::cout <<  " found value localEntry: " << localEntry << " " << val <<  std::endl;
-                        } else {
+                    if ((use_cache_value) && (data.dimension == 1)) {
+                        double val = vec_map_varexp[data.index_varexp];
+                        if (!use_map_varexp[data.index_varexp]) {
                             val = data.selector->GetVar(0)->EvalInstance(0);
-                            // std::cout <<  " didn't find value localEntry: " << localEntry << " " << val <<  std::endl;
+                            vec_map_varexp[data.index_varexp] = val;
+                            use_map_varexp[data.index_varexp] = true;
                         }
-                        map_varexp[data.hash_varexp] = val;
                         data.selector->ProcessFillMine(localEntry, true, val); //<==call user analysis function
                     } else {
                         data.selector->ProcessFill(localEntry); //<==call user analysis function

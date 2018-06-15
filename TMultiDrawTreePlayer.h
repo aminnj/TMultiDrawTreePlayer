@@ -51,10 +51,11 @@ struct DrawData {
     Long64_t    nentries;
     std::string options;
     std::string s_varexp;
+    std::string s_varexp_nohist;
     std::string s_selector;
-    int hash_varexp;
-    int hash_selector;
     int dimension;
+    int index_varexp;
+    int index_selector;
 };
 
 class NotifyProxier: public TObject {
