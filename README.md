@@ -2,7 +2,10 @@
 
 ### Note: this is just a fork with more features -- I take no credit away from the original author for the idea/main implementation.
 
-An extension of ``TTreePlayer`` to support multiple draw calls per tree loop
+An extension of ``TTreePlayer`` to support 
+* multiple draw calls per tree loop
+* multithreaded looping (with python API through multiprocessing)
+* caching of identical expression values, selection strings (boolean), and selection values (weights)
 
 ## Context
 
