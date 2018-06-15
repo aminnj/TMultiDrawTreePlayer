@@ -22,7 +22,15 @@ Bool_t TSelectorMultiDraw::CompileVariables(const char *varexp/* = ""*/, const c
 ////////////////////////////////////////////////////////////////////////////////
 /// Called in the entry loop for all entries accepted by Select.
 
-void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double cache_val)
+double TSelectorMultiDraw::GetSelect() {
+    if (fSelect) {
+        return fSelect->EvalInstance(0);
+    } else {
+        return 1.0;
+    }
+}
+
+void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double cache_val, double weight)
 {
     // fObjEval fMultiplicity fForceRead fSelect fVal fNfill 
     // printf("%i %i %i %i\n",fObjEval,fMultiplicity,fForceRead,fNfill);
@@ -42,7 +50,8 @@ void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double 
    if (fForceRead && fManager->GetNdata() <= 0) return;
 
    if (fSelect) {
-       fW[fNfill] = fWeight * fSelect->EvalInstance(0); // XXX <--- the fSelect eval is slow!, cache it!
+       if (use_cache) fW[fNfill] = fWeight * weight;
+       else fW[fNfill] = fWeight * fSelect->EvalInstance(0); // XXX <--- the fSelect eval is slow!, cache it!
        // printf("%f\n", weight);
        // fW[fNfill] = fWeight * weight;
        if (!fW[fNfill]) return;

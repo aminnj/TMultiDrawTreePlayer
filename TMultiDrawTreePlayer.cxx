@@ -407,9 +407,11 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
     // vector of booleans to tell whether a particular index has been cached
     std::vector<bool> use_map_selectors(maxidx, false);
     std::vector<bool> use_map_varexp(maxidx, false);
+    std::vector<bool> use_map_weight(maxidx, false);
     // cached values
     std::vector<bool> vec_map_selectors(maxidx, false);
     std::vector<double> vec_map_varexp(maxidx, -999.);
+    std::vector<double> vec_map_weight(maxidx, 1.0);
 
 
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
@@ -424,7 +426,10 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
         // reset booleans to false (so we will need to recompute/recache)
         if (use_cache_selector) std::fill(use_map_selectors.begin(), use_map_selectors.end(), false);
-        if (use_cache_value) std::fill(use_map_varexp.begin(), use_map_varexp.end(), false);
+        if (use_cache_value) {
+            std::fill(use_map_varexp.begin(), use_map_varexp.end(), false);
+            std::fill(use_map_weight.begin(), use_map_weight.end(), false);
+        }
 
         bool abort = false;
         bool skipToNextFile = false;
@@ -464,7 +469,13 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
                             vec_map_varexp[data.index_varexp] = val;
                             use_map_varexp[data.index_varexp] = true;
                         }
-                        data.selector->ProcessFillMine(localEntry, true, val); //<==call user analysis function
+                        double weight = vec_map_weight[data.index_selector];
+                        if (!use_map_weight[data.index_selector]) {
+                            weight = data.selector->GetSelect();
+                            vec_map_weight[data.index_selector] = weight;
+                            use_map_weight[data.index_selector] = true;
+                        }
+                        data.selector->ProcessFillMine(localEntry, true, val, weight); //<==call user analysis function
                     } else {
                         data.selector->ProcessFill(localEntry); //<==call user analysis function
                     }

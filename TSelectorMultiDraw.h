@@ -10,7 +10,8 @@ class TSelectorMultiDraw: public TSelectorDraw {
 
     public:
         
-        virtual void ProcessFillMine(Long64_t entry, bool use_cache=false, double cache_val=-999.);
+        virtual double GetSelect();
+        virtual void ProcessFillMine(Long64_t entry, bool use_cache=false, double cache_val=-999., double weight=1.);
 
         ClassDef(TSelectorMultiDraw, 1);  //A specialized TSelector for multi-drawing
 };
