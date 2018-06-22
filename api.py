@@ -1,3 +1,4 @@
+import pickle
 import time
 import os
 from tqdm import tqdm
@@ -73,7 +74,23 @@ class ParallelMultiDrawer(object):
         self.hist_names.append(hist.split("(",1)[0])
         self.queued.append([varexp, hist, selection, option, nentries, firstentry])
 
-    def execute(self, N=1, use_my_tqdm=True):
+    def execute(self, N=1, use_my_tqdm=True, file_cache=None):
+
+
+
+        # if user wants to cache histograms in file, then make sure
+        # the hash of all the queued draws + list of all files in tchain
+        # matches what was in the file
+        # In principle, if those 2 match, then results must be identical
+        file_hash = hash("".join(sorted([x.GetTitle() for x in (self.ch.GetListOfFiles())])))
+        queue_hash = hash(tuple(map(tuple,sorted(self.queued))))
+        total_hash = hash(queue_hash+file_hash)
+        if file_cache and os.path.exists(file_cache):
+            with open(file_cache,"r") as fh:
+                data = pickle.load(fh)
+                hash_cache = data["hash"]
+                if hash_cache == total_hash:
+                    return data["hists"]
 
         def reduce_hists(dicts):
             d_master = {}
@@ -113,6 +130,7 @@ class ParallelMultiDrawer(object):
             r.gROOT.ProcessLine(".L {}/tqdm.h".format(os.path.realpath(__file__).rsplit("/",1)[0]))
             bar = r.tqdm()
 
+        os.nice(10)
         q = Queue(N)
         dones, totals, workers = [], [], []
         for i, (first, numentries) in enumerate(firsts_and_nentries):
@@ -135,10 +153,9 @@ class ParallelMultiDrawer(object):
                 bar.progress(done,total,True)
                 which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
                 bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
-                time.sleep(0.5)
+                time.sleep(0.15)
             bar.progress(total,total,True)
             bar.set_label("[{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8")))
-            print
         else:
             total = last
             prev_done = get_sum(dones)
@@ -158,6 +175,27 @@ class ParallelMultiDrawer(object):
         for worker in workers:
             worker.join()
 
-        return reduce_hists(dicts)
+        # don't let one tqdm bar clobber another
+        print
 
+        reduced_hists = reduce_hists(dicts)
+
+        # if user wants to cache histograms in file,
+        # then dump the hists as well as a hash
+        if file_cache:
+            with open(file_cache,"w") as fh:
+                data = {"hash": total_hash, "hists": reduced_hists}
+                pickle.dump(data,fh)
+
+        return reduced_hists
+
+    def quick_draw(self,var,hist="h1",sel="", drawopt=""):
+        self.queue(var,hist,sel,drawopt)
+        hists = self.execute()
+        c1 = r.TCanvas()
+        h1 = hists[hist.split("(",1)[0]]
+        h1.Draw(drawopt)
+        c1.SaveAs("temp.pdf")
+        os.system("ic temp.pdf")
+        return h1
 

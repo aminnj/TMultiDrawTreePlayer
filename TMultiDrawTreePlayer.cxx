@@ -506,7 +506,7 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
             skipToNextFile = false;
         }
 
-        if (entry % 1000 == 0) {
+        if (entry % 100 == 0) {
             done = entry-firstentry;
         }
     }
