@@ -6,7 +6,7 @@ import ROOT as r
 r.gROOT.SetBatch()
 from multiprocessing import Value, Process, Queue
 
-class MultiDrawer(object):
+class MultiDrawer(r.TChain):
 
     def __init__(self, ch=None):
         self.ch = ch
@@ -18,6 +18,10 @@ class MultiDrawer(object):
 
         self.initialize_tmultidraw()
         self.initialize_chain()
+
+        super(self.__class__, self).__init__()
+        if ch:
+            self.Add(ch)
 
     def initialize_tmultidraw(self):
         import ROOT
@@ -63,12 +67,15 @@ class MultiDrawer(object):
                 self.hists[hn] = r.gDirectory.Get(hn)
         return self.hists
 
-class ParallelMultiDrawer(object):
+class ParallelMultiDrawer(r.TChain):
 
     def __init__(self, ch=None):
         self.ch = ch
         self.hist_names = []
         self.queued = []
+
+        super(self.__class__, self).__init__()
+        self.Add(ch)
 
     def queue(self, varexp, hist="htemp", selection="", option="goff", nentries=1000000000, firstentry=0):
         self.hist_names.append(hist.split("(",1)[0])
@@ -144,7 +151,6 @@ class ParallelMultiDrawer(object):
         def get_sum(cs):
             return sum(map(lambda x:x.value, cs))
 
-
         if use_my_tqdm:
             total = last
             done = get_sum(dones)
@@ -189,9 +195,9 @@ class ParallelMultiDrawer(object):
 
         return reduced_hists
 
-    def quick_draw(self,var,hist="h1",sel="", drawopt=""):
+    def quick_draw(self,var,hist="h1",sel="", drawopt="",**kwargs):
         self.queue(var,hist,sel,drawopt)
-        hists = self.execute()
+        hists = self.execute(**kwargs)
         c1 = r.TCanvas()
         h1 = hists[hist.split("(",1)[0]]
         h1.Draw(drawopt)
