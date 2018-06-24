@@ -18,7 +18,14 @@
 #include <limits>
 #include <map>
 
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 ClassImp(TMultiDrawTreePlayer)
+
+bool STOP_REQUESTED;
+
 
 TMultiDrawTreePlayer::TMultiDrawTreePlayer():
     TTreePlayer() {
@@ -301,6 +308,12 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
     //  specified Tree entries.
 
     //TDirectory::TContext ctxt(0);
+
+    STOP_REQUESTED = false;
+    signal(SIGINT, [](int){
+            std::cout << "SIGINT Caught, stopping after current event" << std::endl;
+            STOP_REQUESTED=true;
+            });
     
     // Map from draw/selection strings to arbitrary int (to uniquify both)
     std::map<std::string,int> unique_varexp;
@@ -415,6 +428,8 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
 
     for (entry=firstentry;entry<firstentry+nentries;entry++) {
+        if (STOP_REQUESTED) break;
+
         entryNumber = fTree->GetEntryNumber(entry);
         if (entryNumber < 0) break;
         if (timer && timer->ProcessEvents()) break;
