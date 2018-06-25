@@ -490,7 +490,8 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
                             vec_map_weight[data.index_selector] = weight;
                             use_map_weight[data.index_selector] = true;
                         }
-                        data.selector->ProcessFillMine(localEntry, true, val, weight); //<==call user analysis function
+                        data.selector->SetCache(val, weight); //<==call user analysis function
+                        data.selector->ProcessFillMine(localEntry); //<==call user analysis function
                     } else {
                         data.selector->ProcessFill(localEntry); //<==call user analysis function
                     }

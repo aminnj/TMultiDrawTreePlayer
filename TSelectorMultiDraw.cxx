@@ -30,12 +30,13 @@ double TSelectorMultiDraw::GetSelect() {
     }
 }
 
-void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double cache_val, double weight)
+void TSelectorMultiDraw::SetCache(double val, double weight) {
+    fCacheVal = val;
+    fCacheWeight = weight;
+}
+
+void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache)
 {
-    // fObjEval fMultiplicity fForceRead fSelect fVal fNfill 
-    // printf("%i %i %i %i\n",fObjEval,fMultiplicity,fForceRead,fNfill);
-    // printf("%i %i\n",fNfill,fTree->GetEstimate());
-    // printf("%f %f %i %f\n",fWeight,fSelect->EvalInstance(0), fDimension, fVar[0]->EvalInstance(0));
    if (fObjEval) {
       ProcessFillObject(entry);
       return;
@@ -50,16 +51,13 @@ void TSelectorMultiDraw::ProcessFillMine(Long64_t entry, bool use_cache, double 
    if (fForceRead && fManager->GetNdata() <= 0) return;
 
    if (fSelect) {
-       if (use_cache) fW[fNfill] = fWeight * weight;
-       else fW[fNfill] = fWeight * fSelect->EvalInstance(0); // XXX <--- the fSelect eval is slow!, cache it!
-       // printf("%f\n", weight);
-       // fW[fNfill] = fWeight * weight;
+       if (use_cache) fW[fNfill] = fWeight * fCacheWeight;
+       else fW[fNfill] = fWeight * fSelect->EvalInstance(0); // XXX <--- the fSelect eval is slow!, cached it!
        if (!fW[fNfill]) return;
-        // printf("%f %f\n",fWeight,fW[fNfill]);
    } else fW[fNfill] = fWeight;
    if (fVal) {
        if (fDimension == 1 && use_cache) {
-           fVal[0][fNfill] = cache_val;
+           fVal[0][fNfill] = fCacheVal;
        } else {
            for (Int_t i = 0; i < fDimension; ++i) {
                if (fVar[i]) fVal[i][fNfill] = fVar[i]->EvalInstance(0);
