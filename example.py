@@ -1,7 +1,6 @@
 import os
 import ROOT as r
 import api # This powers up TChain ;)
-import time
 
 def make_example_tree(fname):
     """
