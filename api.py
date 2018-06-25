@@ -196,7 +196,7 @@ class ParallelTChain(r.TChain):
                     bar.progress(done,total,True)
                     which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
                     bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
-                    time.sleep(0.15)
+                    time.sleep(0.03)
                 bar.progress(total,total,True)
                 bar.set_label("[{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8")))
             else:

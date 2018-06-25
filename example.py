@@ -1,5 +1,6 @@
+import os
 import ROOT as r
-import api_test
+import api # This powers up TChain ;)
 import time
 
 def make_example_tree(fname):
@@ -54,10 +55,22 @@ if __name__ == "__main__":
     ch = r.TChain("t")
     ch.Add("test.root")
 
+    # Woah, these are, like, normal draw statements...
     ch.Draw("v2.Eta()>>h1(5,0,100)","v1<0.5")
     ch.Draw("v2.Pt()>>h2(10,0,100)","v1<0.5")
     ch.Draw("v2.Eta()>>h3(5,0,100)","v3>7")
     ch.Draw("v3>>h5(10,0,100)")
 
-    hists = ch.GetHists(N=5)
+    # Execute all draw statements in a single loop, using N processes, and returning a dictionary of histograms
+    hists = ch.GetHists(N=3)
+    print(hists)
+    print("Histogram mean values: {}".format(map(lambda x: x.GetMean(), hists.values())))
+
+    # Every time, we do another loop, but what if we want to cache histograms if they are the same?
+    os.system("rm -f test_cache.pkl")
+    hists = ch.GetHists(N=5, file_cache="test_cache.pkl")
+    print("Histogram mean values: {}".format(map(lambda x: x.GetMean(), hists.values())))
+
+    # Since we cached them last loop, this one is instantaneous
+    hists = ch.GetHists(file_cache="test_cache.pkl")
     print("Histogram mean values: {}".format(map(lambda x: x.GetMean(), hists.values())))
