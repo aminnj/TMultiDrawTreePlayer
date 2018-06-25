@@ -1,5 +1,5 @@
 import ROOT as r
-from api import ParallelMultiDrawer
+import api_test
 import time
 
 def make_example_tree(fname):
@@ -54,27 +54,10 @@ if __name__ == "__main__":
     ch = r.TChain("t")
     ch.Add("test.root")
 
-    # Make a multidrawer object
-    md = ParallelMultiDrawer(ch)
+    ch.Draw("v2.Eta()>>h1(5,0,100)","v1<0.5")
+    ch.Draw("v2.Pt()>>h2(10,0,100)","v1<0.5")
+    ch.Draw("v2.Eta()>>h3(5,0,100)","v3>7")
+    ch.Draw("v3>>h5(10,0,100)")
 
-    # Queue up many draw statements -- expression, histogram, selector
-    # These are all done in a single loop through the chain
-    md.queue("v2.Eta()","h1(5,0,100)","v1<0.5")
-    md.queue("v2.Pt()","h2(10,0,100)","v1<0.5")
-    md.queue("v2.Eta()","h3(5,0,100)","v3>7")
-    md.queue("v3","h5(10,0,100)")
-
-    # Use N threads - generally results in factor of N speedup
-    # Since we're limited by CPU for unpacking objects from the rootfile
-    hists = md.execute(N=5)
+    hists = ch.GetHists(N=5)
     print("Histogram mean values: {}".format(map(lambda x: x.GetMean(), hists.values())))
-
-    # Now try with conventional TTree Draw statements
-    print("Now trying conventional tree drawing...")
-    N = ch.GetEntries()
-    t0 = time.time()
-    ch.Draw("v2.Eta()>>h1(5,0,100)","v1<0.5","goff")
-    ch.Draw("v2.Pt()>>h2(10,0,100)","v1<0.5","goff")
-    ch.Draw("v2.Eta()>>h3(5,0,100)","v3>7","goff")
-    ch.Draw("v3>>h5(10,0,100)","","goff")
-    print("Regular draw statements processed at {:.1f}kHz".format(0.001*N/(time.time()-t0)))

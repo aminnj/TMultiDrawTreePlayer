@@ -1,14 +1,15 @@
 import pickle
 import time
 import os
-from tqdm import tqdm
+import re
 import ROOT as r
 r.gROOT.SetBatch()
 from multiprocessing import Value, Process, Queue
 
-class MultiDrawer(r.TChain):
+class BaseTChain():
 
-    def __init__(self, ch=None):
+    def __init__(self, ch):
+
         self.ch = ch
         self.player = None
         self.nentries = -1
@@ -19,9 +20,7 @@ class MultiDrawer(r.TChain):
         self.initialize_tmultidraw()
         self.initialize_chain()
 
-        super(self.__class__, self).__init__()
-        if ch:
-            self.Add(ch)
+        self.executed = True
 
     def initialize_tmultidraw(self):
         import ROOT
@@ -39,18 +38,15 @@ class MultiDrawer(r.TChain):
     def queue(self, varexp, hist="htemp", selection="", option="goff", nentries=1000000000, firstentry=0):
         self.hist_names.append(hist.split("(",1)[0])
         self.player.queueDraw("{}>>{}".format(varexp,hist), selection, option, nentries, firstentry)
-
-    def get_entries(self):
-        r.gErrorIgnoreLevel = r.kError
-        self.nentries = self.player.GetEntries("")
-        r.gErrorIgnoreLevel = -1
-        return self.nentries
+        self.executed = False
 
     def execute(self):
-        self.get_entries()
-        # argument is `quiet` -- True does not show progress bar
-        self.player.execute(False)
+        if not self.executed:
+            self.get_entries()
+            # argument is `quiet` -- True does not show progress bar
+            self.player.execute(False)
 
+        self.executed = True
         return self.get_hists()
 
     def execute_parallel(self, first,numentries,done,total):
@@ -58,32 +54,66 @@ class MultiDrawer(r.TChain):
         self.nentries = self.player.GetEntries("")
         r.gErrorIgnoreLevel = -1
 
-        # self.player.execute(False,first,numentries,done,total)
-        self.player.execute(True,first,numentries,done,total)
+        quiet = True
+        self.player.execute(quiet,first,numentries,done,total)
 
     def get_hists(self):
+        if not self.executed:
+            self.execute()
+
         if not self.hists:
             for hn in set(self.hist_names):
                 self.hists[hn] = r.gDirectory.Get(hn)
         return self.hists
 
-class ParallelMultiDrawer(r.TChain):
+oldinit = r.TChain.__init__
+class ParallelTChain(r.TChain):
 
-    def __init__(self, ch=None):
-        self.ch = ch
+    def __init__(self, *args):
+        oldinit(self, *args)
+
+        self.ch = self
         self.hist_names = []
         self.queued = []
 
-        super(self.__class__, self).__init__()
-        self.Add(ch)
+        self.executed = True
 
-    def queue(self, varexp, hist="htemp", selection="", option="goff", nentries=1000000000, firstentry=0):
-        self.hist_names.append(hist.split("(",1)[0])
-        self.queued.append([varexp, hist, selection, option, nentries, firstentry])
+    # def Draw(self, varexp, hist=None, selection="", option="goff", nentries=1000000000, firstentry=0):
+    def Draw(self, varexp, selection="", option="goff", nentries=1000000000, firstentry=0):
 
-    def execute(self, N=1, use_my_tqdm=True, file_cache=None):
+        # If option doesn't have goff, add it
+        option += "goff" if "goff" not in option else ""
 
+        # Separate blah>>h into 'blah' and 'h'
+        tmp = varexp.rsplit(">>",1)
+        if len(tmp) > 1: hist = tmp[1]
+        else: hist = ""
+        varexp = tmp[0]
 
+        # If histogram is unnamed, name it.
+        binning = ""
+        if not hist or not hist.strip():
+            hname = "htemp_1"
+        else:
+            tokens = hist.split("(",1)
+            if len(tokens) == 1: hname, binning = tokens[0], ""
+            else: hname, binning = tokens[0], "("+tokens[1]
+        # If histogram name is a duplicate, increment a number until it's not anymore
+        # https://codegolf.stackexchange.com/questions/38033/increment-every-number-in-a-string
+        while hname in self.hist_names:
+            hname, nreplacements = re.subn('\d+', lambda x: str(int(x.group())+1),hname)
+            # If we didn't find a number to replace, this loop will never end
+            # So let's stick a number at the end of the name
+            if nreplacements == 0:
+                hname = "{}_1".format(hname)
+        hist = "{}{}".format(hname,binning)
+
+        self.hist_names.append(hname)
+        info = [varexp, hist, selection, option, nentries, firstentry]
+        self.queued.append(info)
+        self.executed = False
+
+    def GetHists(self, N=1, use_my_tqdm=True, file_cache=None):
 
         # if user wants to cache histograms in file, then make sure
         # the hash of all the queued draws + list of all files in tchain
@@ -99,6 +129,9 @@ class ParallelMultiDrawer(r.TChain):
                 if hash_cache == total_hash:
                     return data["hists"]
 
+        # take list of dicts of histname:histogram items
+        # and reduce them by adding and removing the prefix up to the first
+        # underscore
         def reduce_hists(dicts):
             d_master = {}
             for idx,d in enumerate(dicts):
@@ -111,9 +144,11 @@ class ParallelMultiDrawer(r.TChain):
                         d_master[stripped_name].Add(h)
             return d_master
 
+        # take variety of things and put histograms from loop into a queue
         def get_hists(q, ch, queued, num, first, numentries, done, total):
             prefix = "md{}_".format(num)
-            md = MultiDrawer(ch.Clone("ch_{}".format(prefix)))
+            clone = ch.Clone("ch_{}".format(prefix))
+            md = BaseTChain(clone)
             for x_ in queued:
                 x = x_[:]
                 x[1] = "{}{}".format(prefix,x[1])
@@ -127,6 +162,7 @@ class ParallelMultiDrawer(r.TChain):
             return 0
 
 
+        # compute event splitting for N jobs
         first, last = 0, int(self.ch.GetEntries())
         size = int((last-first) / N)
         firsts = [first+i*size for i in range(N)] + [last]
@@ -151,28 +187,32 @@ class ParallelMultiDrawer(r.TChain):
         def get_sum(cs):
             return sum(map(lambda x:x.value, cs))
 
-        if use_my_tqdm:
-            total = last
-            done = get_sum(dones)
-            while done < total:
+        try:
+            if use_my_tqdm:
+                total = last
                 done = get_sum(dones)
-                bar.progress(done,total,True)
-                which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
-                bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
-                time.sleep(0.15)
-            bar.progress(total,total,True)
-            bar.set_label("[{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8")))
-        else:
-            total = last
-            prev_done = get_sum(dones)
-            done = get_sum(dones)
-            with tqdm(total=total) as pbar:
-                while done < total-1:
+                while done < total:
                     done = get_sum(dones)
-                    update = done - prev_done
-                    prev_done = done
-                    pbar.update(update)
-                    time.sleep(0.1)
+                    bar.progress(done,total,True)
+                    which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
+                    bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
+                    time.sleep(0.15)
+                bar.progress(total,total,True)
+                bar.set_label("[{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8")))
+            else:
+                from tqdm import tqdm
+                total = last
+                prev_done = get_sum(dones)
+                done = get_sum(dones)
+                with tqdm(total=total) as pbar:
+                    while done < total-1:
+                        done = get_sum(dones)
+                        update = done - prev_done
+                        prev_done = done
+                        pbar.update(update)
+                        time.sleep(0.1)
+        except KeyboardInterrupt as e:
+            print("[!] Early keyboard interruption...continuing with histograms anyway")
 
         dicts = []
         for iw in range(len(workers)):
@@ -193,15 +233,8 @@ class ParallelMultiDrawer(r.TChain):
                 data = {"hash": total_hash, "hists": reduced_hists}
                 pickle.dump(data,fh)
 
+        self.executed = True
+
         return reduced_hists
 
-    def quick_draw(self,var,hist="h1",sel="", drawopt="",**kwargs):
-        self.queue(var,hist,sel,drawopt)
-        hists = self.execute(**kwargs)
-        c1 = r.TCanvas()
-        h1 = hists[hist.split("(",1)[0]]
-        h1.Draw(drawopt)
-        c1.SaveAs("temp.pdf")
-        os.system("ic temp.pdf")
-        return h1
-
+r.TChain = ParallelTChain
