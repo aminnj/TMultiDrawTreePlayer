@@ -275,11 +275,12 @@ bool TMultiDrawTreePlayer::queueDraw(const char* varexp0, const char* selection,
 bool TMultiDrawTreePlayer::execute(bool quiet) {
     int done = 0;
     int total = 0;
-    return TMultiDrawTreePlayer::execute(quiet, -1, -1, done, total);
+    int bytesread = 0;
+    return TMultiDrawTreePlayer::execute(quiet, -1, -1, done, total, bytesread);
 }
 
 // bool TMultiDrawTreePlayer::execute(bool quiet, int& done, int& total) {
-bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& done, int& total) {
+bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& done, int& total, int& bytesread) {
     if (m_draws.empty())
         return false;
 
@@ -513,6 +514,7 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
         if (gMonitoringWriter)
             gMonitoringWriter->SendProcessingProgress((entry-firstentry),TFile::GetFileBytesRead()-readbytesatstart,kTRUE);
 
+
         if (abort)
             break;
 
@@ -524,6 +526,7 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
 
         if (entry % 100 == 0) {
             done = entry-firstentry;
+            bytesread = TFile::GetFileBytesRead();
         }
     }
     done = nentries;

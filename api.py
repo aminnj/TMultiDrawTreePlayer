@@ -6,6 +6,31 @@ import ROOT as r
 r.gROOT.SetBatch()
 from multiprocessing import Value, Process, Queue
 
+class TimedQueue():
+    def __init__(self,N=10):
+        self.N = N
+        self.vals = [0]
+        self.times = [time.time()]
+
+    def get_last_val(self):
+        return self.vals[-1]
+
+    def add_val(self,val):
+        self.vals.append(val)
+        self.times.append(time.time())
+        self.clip()
+
+    def clip(self):
+        if len(self.vals) > self.N:
+            self.vals.pop(0)
+            self.times.pop(0)
+
+    def get_rate(self):
+        dx = (self.vals[-1] - self.vals[0])
+        dt = (self.times[-1] - self.times[0])
+        return dx/dt
+
+
 class BaseTChain():
 
     def __init__(self, ch):
@@ -49,13 +74,13 @@ class BaseTChain():
         self.executed = True
         return self.get_hists()
 
-    def execute_parallel(self, first,numentries,done,total):
+    def execute_parallel(self, first,numentries,done,total,bytesread):
         r.gErrorIgnoreLevel = r.kError
         self.nentries = self.player.GetEntries("")
         r.gErrorIgnoreLevel = -1
 
         quiet = True
-        self.player.execute(quiet,first,numentries,done,total)
+        self.player.execute(quiet,first,numentries,done,total,bytesread)
 
     def get_hists(self):
         if not self.executed:
@@ -145,7 +170,7 @@ class ParallelTChain(r.TChain):
             return d_master
 
         # take variety of things and put histograms from loop into a queue
-        def get_hists(q, ch, queued, num, first, numentries, done, total):
+        def get_hists(q, ch, queued, num, first, numentries, done, total, bytesread):
             prefix = "md{}_".format(num)
             clone = ch.Clone("ch_{}".format(prefix))
             md = BaseTChain(clone)
@@ -153,7 +178,7 @@ class ParallelTChain(r.TChain):
                 x = x_[:]
                 x[1] = "{}{}".format(prefix,x[1])
                 md.queue(*x)
-            md.execute_parallel(first,numentries,done.get_obj(),total.get_obj())
+            md.execute_parallel(first,numentries,done.get_obj(),total.get_obj(), bytesread.get_obj())
             hists = {}
             hist_names = map(lambda x:x[1].split("(",1)[0], queued)
             for hn in set(hist_names):
@@ -175,30 +200,39 @@ class ParallelTChain(r.TChain):
 
         os.nice(10)
         q = Queue(N)
-        dones, totals, workers = [], [], []
+        dones, totals, bytess, workers = [], [], [], []
         for i, (first, numentries) in enumerate(firsts_and_nentries):
-            done, total = Value("i",0), Value("i",0)
-            worker = Process(target=get_hists, args=[q,self.ch,self.queued,i,first,numentries,done,total])
+            done, total, bytesread = Value("i",0), Value("i",0), Value("i",0)
+            worker = Process(target=get_hists, args=[q,self.ch,self.queued,i,first,numentries,done,total,bytesread])
             workers.append(worker)
             worker.start()
             dones.append(done.get_obj())
+            bytess.append(bytesread.get_obj())
             totals.append(total.get_obj())
 
         def get_sum(cs):
             return sum(map(lambda x:x.value, cs))
 
         try:
+            ioq = TimedQueue(N=30)
             if use_my_tqdm:
                 total = last
                 done = get_sum(dones)
+                bytesread = get_sum(bytess)
                 while done < total:
                     done = get_sum(dones)
+                    bytesread = get_sum(bytess)
+                    ioq.add_val(1.0*bytesread/1e6)
                     bar.progress(done,total,True)
                     which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
-                    bar.set_label("[{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8")))
-                    time.sleep(0.03)
+                    label = "[{:.1f}MB @ {:.1f}MB/s]".format(ioq.get_last_val(),ioq.get_rate())
+                    label += " [{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8"))
+                    bar.set_label(label)
+                    time.sleep(0.04)
+                label = "[{:.1f}MB @ {:.1f}MB/s]".format(ioq.get_last_val(),ioq.get_rate())
+                label += " [{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8"))
+                bar.set_label(label)
                 bar.progress(total,total,True)
-                bar.set_label("[{}]".format("".join([unichr(0x2022) for _ in dones]).encode("utf-8")))
             else:
                 from tqdm import tqdm
                 total = last
