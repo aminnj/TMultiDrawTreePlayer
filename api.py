@@ -142,11 +142,13 @@ class ParallelTChain(r.TChain):
 
         # if user wants to cache histograms in file, then make sure
         # the hash of all the queued draws + list of all files in tchain
+        # + all the aliases and their values
         # matches what was in the file
-        # In principle, if those 2 match, then results must be identical
+        # In principle, if those match, then results must be identical
         file_hash = hash("".join(sorted([x.GetTitle() for x in (self.ch.GetListOfFiles())])))
+        alias_hash = hash(tuple(sorted([(x.GetName(),self.ch.GetAlias(x.GetName())) for x in (self.ch.GetListOfAliases() or [])])))
         queue_hash = hash(tuple(map(tuple,sorted(self.queued))))
-        total_hash = hash(queue_hash+file_hash)
+        total_hash = hash(queue_hash+file_hash+alias_hash)
         if file_cache and os.path.exists(file_cache):
             with open(file_cache,"r") as fh:
                 data = pickle.load(fh)
