@@ -33,7 +33,7 @@ class tqdm {
         bool is_tty = isatty(1);
         bool use_colors = true;
         bool color_transition = true;
-        int width = 40;
+        int width = 25;
 
         std::string right_pad = "▏";
         std::string label = "";
