@@ -210,6 +210,8 @@ class ParallelTChain(r.TChain):
     def GetHists(self, N=1, use_custom_tqdm=True, file_cache=None):
         self.pre_execution()
 
+        _, con_width = map(int,os.popen('stty size', 'r').read().split())
+
         # if user wants to cache histograms in file, then make sure
         # the hash of all the queued draws + list of all files in tchain
         # + all the aliases and their values
@@ -218,8 +220,10 @@ class ParallelTChain(r.TChain):
         file_hash = hash("".join(sorted([x.GetTitle() for x in (self.ch.GetListOfFiles())])))
         # FIXME on osx, the below line will cause a crash after looping when an alias is used
         # does something special happen when calling GetAlias() or GetListOfAliases() before running?
-        alias_hash = hash(tuple(sorted([(x.GetName(),self.ch.GetAlias(x.GetName())) for x in (self.ch.GetListOfAliases() or [])])))
-        # alias_hash = 1
+        if os.uname()[0] == "Darwin":
+            alias_hash = 1
+        else:
+            alias_hash = hash(tuple(sorted([(x.GetName(),self.ch.GetAlias(x.GetName())) for x in (self.ch.GetListOfAliases() or [])])))
         queue_hash = hash(tuple(map(tuple,sorted(self.queued))))
         total_hash = hash(queue_hash+file_hash+alias_hash)
         if file_cache and os.path.exists(file_cache):
@@ -299,8 +303,11 @@ class ParallelTChain(r.TChain):
                     ioq.add_val(1.0*bytesread/1e6)
                     bar.progress(done,total,True)
                     which_done = map(lambda x:(x[0].value==x[1].value)and(x[0].value>0), zip(dones,totals))
-                    label = "[{:.1f}MB @ {:.1f}MB/s]".format(ioq.get_last_val(),ioq.get_rate())
-                    label += " [{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8"))
+                    if con_width > 110:
+                        label = "[{:.1f}MB @ {:.1f}MB/s]".format(ioq.get_last_val(),ioq.get_rate())
+                        label += " [{}]".format("".join(map(lambda x:unichr(0x2022) if x else unichr(0x2219),which_done)).encode("utf-8"))
+                    else:
+                        label = ""
                     bar.set_label(label)
                     time.sleep(0.04)
                 label = "[{:.1f}MB @ {:.1f}MB/s]".format(ioq.get_last_val(),ioq.get_rate())
