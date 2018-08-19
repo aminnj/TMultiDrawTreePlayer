@@ -30,6 +30,94 @@ class TimedQueue():
         dt = (self.times[-1] - self.times[0])
         return dx/dt
 
+class Drawables(list):
+    def __init__(self, *args):
+        super(Drawables, self).__init__(*args)
+
+        self.make_consistent()
+
+    def __repr__(self):
+        if len(self) > 10:
+            joined = "\n\t".join(map(lambda x:x.__repr__(),self[:3]))
+            joined += "\n\t... {} more ...\n\t".format(len(self)-6)
+            joined += "\n\t".join(map(lambda x:x.__repr__(),self[-3:]))
+        else:
+            joined = "\n\t".join(map(lambda x:x.__repr__(),self))
+        return "<Drawables \n\t{}\n>".format(joined)
+
+    def make_consistent(self):
+        # if the histogram has already been seen in this set of drawables
+        # append _idup<#> to the end, where <#> keeps increasing to guarantee
+        # uniqueness.
+        seen = set([])
+        latest_idx = {}
+        for d in self:
+            hn = d.get_histname()
+            if hn in seen:
+                idx = latest_idx.get(hn,0)+1
+                latest_idx[hn] = idx
+                hn = "{}_idup{}".format(hn,idx)
+                d.histname = hn
+            seen.add(d.get_histname())
+
+class Drawable(object):
+    def __init__(self,
+            varexp = "",
+            selection = "",
+            option = "goff",
+            nentries = 1000000000,
+            firstentry = 0,
+            ):
+        self.varexp = varexp
+        self.selection = selection
+        self.option = option
+        self.nentries = nentries
+        self.firstentry = firstentry
+        self.histname = ""
+        self.histbinning = ""
+
+        self.parse_varexp()
+
+    def __repr__(self):
+        return "<Drawable (\"{}>>{}{}\", \"{}\", \"{}\", {}, {}) at {}>".format(
+                self.varexp,
+                self.histname,
+                self.histbinning,
+                self.selection,
+                self.option,
+                self.nentries,
+                self.firstentry,
+                hex(id(self)),
+                )
+
+    def parse_varexp(self):
+        if self.histname: return
+
+        # try >>histname pattern
+        tmp = self.varexp.rsplit(">>",1)
+        if len(tmp) == 2:
+            namebin = tmp[1]
+            self.varexp = tmp[0]
+            if "(" in tmp[1]:
+                self.histname = tmp[1].split("(")[0]
+                self.histbinning = "("+tmp[1].split("(")[1]
+            else:
+                self.histname = tmp[1]
+
+    def get_histname(self):
+        return self.histname
+
+    def get_histbinning(self):
+        return self.histbinning
+
+    def get_histnamebinning(self):
+        if self.histbinning:
+            return "{}{}".format(self.histname, self.histbinning)
+        else:
+            return self.histname
+
+    def get_hash(self):
+        return hash("|".join(map(str,[self.varexp,self.histname,self.histbinning,self.nentries,self.firstentry])))
 
 class BaseTChain():
 
@@ -39,7 +127,6 @@ class BaseTChain():
         self.player = None
         self.nentries = -1
 
-        self.hist_names = []
         self.hists = {}
 
         self.initialize_tmultidraw()
@@ -61,7 +148,6 @@ class BaseTChain():
         self.player.execute._threaded = True
 
     def queue(self, varexp, hist="htemp", selection="", option="goff", nentries=1000000000, firstentry=0):
-        self.hist_names.append(hist.split("(",1)[0])
         self.player.queueDraw("{}>>{}".format(varexp,hist), selection, option, nentries, firstentry)
         self.executed = False
 
@@ -72,7 +158,6 @@ class BaseTChain():
             self.player.execute(False)
 
         self.executed = True
-        return self.get_hists()
 
     def execute_parallel(self, first,numentries,done,total,bytesread):
         r.gErrorIgnoreLevel = r.kError
@@ -82,15 +167,6 @@ class BaseTChain():
         quiet = True
         self.player.execute(quiet,first,numentries,done,total,bytesread)
 
-    def get_hists(self):
-        if not self.executed:
-            self.execute()
-
-        if not self.hists:
-            for hn in set(self.hist_names):
-                self.hists[hn] = r.gDirectory.Get(hn)
-        return self.hists
-
 oldinit = r.TChain.__init__
 class ParallelTChain(r.TChain):
 
@@ -98,47 +174,41 @@ class ParallelTChain(r.TChain):
         oldinit(self, *args)
 
         self.ch = self
-        self.hist_names = []
         self.queued = []
+
+        self.drawables = Drawables()
 
         self.executed = True
 
-    # def Draw(self, varexp, hist=None, selection="", option="goff", nentries=1000000000, firstentry=0):
     def Draw(self, varexp, selection="", option="goff", nentries=1000000000, firstentry=0):
-
-        # If option doesn't have goff, add it
+        # Force goff since we're not using this interactively
         option += "goff" if "goff" not in option else ""
-
-        # Separate blah>>h into 'blah' and 'h'
-        tmp = varexp.rsplit(">>",1)
-        if len(tmp) > 1: hist = tmp[1]
-        else: hist = ""
-        varexp = tmp[0]
-
-        # If histogram is unnamed, name it.
-        binning = ""
-        if not hist or not hist.strip():
-            hname = "htemp_1"
-        else:
-            tokens = hist.split("(",1)
-            if len(tokens) == 1: hname, binning = tokens[0], ""
-            else: hname, binning = tokens[0], "("+tokens[1]
-        # If histogram name is a duplicate, increment a number until it's not anymore
-        # https://codegolf.stackexchange.com/questions/38033/increment-every-number-in-a-string
-        while hname in self.hist_names:
-            hname, nreplacements = re.subn('\d+', lambda x: str(int(x.group())+1),hname)
-            # If we didn't find a number to replace, this loop will never end
-            # So let's stick a number at the end of the name
-            if nreplacements == 0:
-                hname = "{}_1".format(hname)
-        hist = "{}{}".format(hname,binning)
-
-        self.hist_names.append(hname)
-        info = [varexp, hist, selection, option, nentries, firstentry]
-        self.queued.append(info)
+        d = Drawable(
+            varexp = varexp,
+            selection = selection,
+            option = option,
+            nentries = nentries,
+            firstentry = firstentry,
+            )
+        self.drawables.append(d)
         self.executed = False
 
-    def GetHists(self, N=1, use_my_tqdm=True, file_cache=None):
+    def pre_execution(self):
+        self.queued = []
+        self.drawables.make_consistent()
+        for d in self.drawables:
+            info = [
+                d.varexp,
+                d.get_histnamebinning(),
+                d.selection,
+                d.option,
+                d.nentries,
+                d.firstentry,
+                ]
+            self.queued.append(info)
+
+    def GetHists(self, N=1, use_custom_tqdm=True, file_cache=None):
+        self.pre_execution()
 
         # if user wants to cache histograms in file, then make sure
         # the hash of all the queued draws + list of all files in tchain
@@ -146,7 +216,10 @@ class ParallelTChain(r.TChain):
         # matches what was in the file
         # In principle, if those match, then results must be identical
         file_hash = hash("".join(sorted([x.GetTitle() for x in (self.ch.GetListOfFiles())])))
+        # FIXME on osx, the below line will cause a crash after looping when an alias is used
+        # does something special happen when calling GetAlias() or GetListOfAliases() before running?
         alias_hash = hash(tuple(sorted([(x.GetName(),self.ch.GetAlias(x.GetName())) for x in (self.ch.GetListOfAliases() or [])])))
+        # alias_hash = 1
         queue_hash = hash(tuple(map(tuple,sorted(self.queued))))
         total_hash = hash(queue_hash+file_hash+alias_hash)
         if file_cache and os.path.exists(file_cache):
@@ -188,7 +261,6 @@ class ParallelTChain(r.TChain):
             q.put(hists)
             return 0
 
-
         # compute event splitting for N jobs
         first, last = 0, int(self.ch.GetEntries())
         size = int((last-first) / N)
@@ -196,7 +268,7 @@ class ParallelTChain(r.TChain):
         diffs = map(lambda x: x[1]-x[0],zip(firsts[:-1],firsts[1:]))
         firsts_and_nentries = zip(firsts[:-1],diffs)
 
-        if use_my_tqdm:
+        if use_custom_tqdm:
             r.gROOT.ProcessLine(".L {}/tqdm.h".format(os.path.realpath(__file__).rsplit("/",1)[0]))
             bar = r.tqdm()
 
@@ -217,7 +289,7 @@ class ParallelTChain(r.TChain):
 
         try:
             ioq = TimedQueue(N=30)
-            if use_my_tqdm:
+            if use_custom_tqdm:
                 total = last
                 done = get_sum(dones)
                 bytesread = get_sum(bytess)

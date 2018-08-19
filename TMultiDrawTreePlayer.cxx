@@ -524,9 +524,9 @@ bool TMultiDrawTreePlayer::execute(bool quiet, int first, int numentries, int& d
             skipToNextFile = false;
         }
 
-        if (entry % 100 == 0) {
+        if (entry % 1000 == 0) {
             done = entry-firstentry;
-            bytesread = TFile::GetFileBytesRead();
+            bytesread = TFile::GetFileBytesRead()-readbytesatstart;
         }
     }
     done = nentries;

@@ -55,6 +55,8 @@ if __name__ == "__main__":
     ch.Add("test.root")
 
     # Woah, these are, like, normal draw statements...
+    ch.SetAlias("x","v1<0.5")
+    ch.Draw("v2.Eta()>>h1(5,0,100)","!x")
     ch.Draw("v2.Eta()>>h1(5,0,100)","v1<0.5")
     ch.Draw("v2.Pt()>>h2(10,0,100)","v1<0.5")
     ch.Draw("v2.Eta()>>h3(5,0,100)","v3>7")
